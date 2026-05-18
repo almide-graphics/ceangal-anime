@@ -14,22 +14,25 @@
 </head>
 <body>
 <div class="tabs">
-  <div class="tab active" onclick="go(0)">Easing</div>
-  <div class="tab" onclick="go(1)">Grid</div>
-  <div class="tab" onclick="go(2)">Fireworks</div>
-  <div class="tab" onclick="go(3)">Wave</div>
-  <div class="tab" onclick="go(4)">Camera</div>
+  <div class="tab active" onclick="go(0)">Morph</div>
+  <div class="tab" onclick="go(1)">Easing</div>
+  <div class="tab" onclick="go(2)">Grid</div>
+  <div class="tab" onclick="go(3)">Fireworks</div>
+  <div class="tab" onclick="go(4)">Wave</div>
+  <div class="tab" onclick="go(5)">Camera</div>
 </div>
 <canvas id="c"></canvas>
 <script>
 const N = (b) => Number(b), B = (n) => BigInt(n);
 let demo = 0, ex;
-const DEMOS = ["scene_easing", "scene_grid", "scene_fireworks", "scene_wave", "scene_camera"];
+const DEMOS = ["scene_morph", "scene_easing", "scene_grid", "scene_fireworks", "scene_wave", "scene_camera"];
+const SHAPES = ["circle", "square", "star", "spiral", "random"];
 const LABELS = [
+  ["Morph", "click to morph — 200 particles, elastic stagger"],
   ["Easing Curves", "10 easings — all computed in WASM"],
   ["Stagger Grid", "12x12 elastic stagger from center"],
   ["Fireworks", "144 particles — elastic radial burst"],
-  ["Wave", "80 bars — sequential stagger"],
+  ["Wave", "responsive bar waveform — sequential stagger"],
   ["Camera", "6x6x3 3D grid — orbit + perspective projection"],
 ];
 const EASE_NAMES = [
@@ -69,7 +72,6 @@ async function main() {
 function draw(canvas) {
   const dpr = window.devicePixelRatio || 1;
   const count = N(ex.get_count());
-  const isCamera = demo === 4;
   const W = window.innerWidth;
   const H = window.innerHeight - 60;
   canvas.width = W * dpr; canvas.height = H * dpr;
@@ -81,7 +83,9 @@ function draw(canvas) {
   ctx.fillStyle = "#fff"; ctx.font = "bold 16px monospace";
   ctx.fillText("ceangal-anime", 20, 28);
   ctx.font = "11px monospace"; ctx.fillStyle = "#555";
-  ctx.fillText(LABELS[demo][1], 180, 28);
+  let subtitle = LABELS[demo][1];
+  if (demo === 0) subtitle += " → " + SHAPES[N(ex.get_morph_shape())] + " (click to morph)";
+  ctx.fillText(subtitle, 180, 28);
 
   for (let i = 0; i < count; i++) {
     const x = N(ex.get_x(B(i)));
@@ -92,7 +96,19 @@ function draw(canvas) {
 
     ctx.globalAlpha = Math.max(0.02, o);
 
-    if (isCamera) {
+    if (demo === 0) {
+      // Morph: glowing particles
+      const r = 3 + s * 3;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = `hsl(${h}, 80%, 65%)`; ctx.fill();
+      if (s > 0.5) {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+        g.addColorStop(0, `hsla(${h}, 85%, 70%, ${o * 0.4})`);
+        g.addColorStop(1, `hsla(${h}, 85%, 70%, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r * 3, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (demo === 5) {
       // Camera: read projected coords
       const sx = N(ex.get_sx(B(i)));
       const sy = N(ex.get_sy(B(i)));
@@ -113,7 +129,7 @@ function draw(canvas) {
           ctx.beginPath(); ctx.arc(sx, sy, r * 2.5, 0, Math.PI * 2); ctx.fill();
         }
       }
-    } else if (demo === 0) {
+    } else if (demo === 1) {
       // Easing: ball on track
       const margin = W * 0.18;
       const trackW = W - margin - 40;
@@ -125,7 +141,7 @@ function draw(canvas) {
       ctx.beginPath(); ctx.roundRect(margin, y, Math.max(0, x - margin), 24, 12); ctx.fill();
       ctx.beginPath(); ctx.arc(x, y + 12, 9, 0, Math.PI * 2);
       ctx.fillStyle = PAL[i % 10]; ctx.fill();
-    } else if (demo === 1) {
+    } else if (demo === 2) {
       // Grid: circle
       const r = 14 * Math.max(0.05, s);
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -137,7 +153,7 @@ function draw(canvas) {
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(x, y, r * 2, 0, Math.PI * 2); ctx.fill();
       }
-    } else if (demo === 2) {
+    } else if (demo === 3) {
       // Fireworks: particle + tail
       const r = 2 + s * 5;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -173,6 +189,10 @@ function go(n) {
   ex[DEMOS[n]]();
   document.querySelectorAll(".tab").forEach((t, i) => t.classList.toggle("active", i === n));
 }
+
+document.getElementById("c").addEventListener("click", () => {
+  if (demo === 0) ex.morph_next();
+});
 main();
 </script>
 </body>

@@ -1,25 +1,38 @@
-// ceangal-anime demo — all animation logic in WASM
+// ceangal-anime demo — particle morphing + classic scenes
 
 import self.easing as ease
 import self.tween as tw
 import self.stagger as stag
 import math
 
-// ── Shared ──
-let MAX = 256
-var xs: List[Float] = []      // current x position
-var ys: List[Float] = []      // current y position
-var scales: List[Float] = []  // current scale
+// ── Shared state ──
+
+let MAX = 300
+var xs: List[Float] = []
+var ys: List[Float] = []
+var scales: List[Float] = []
 var opacities: List[Float] = []
 var hues: List[Float] = []
 var active_count = 0
 
-// Each property can have its own tween
 var tw_x: List[tw.Tween] = []
 var tw_y: List[tw.Tween] = []
 var tw_s: List[tw.Tween] = []
 var tw_o: List[tw.Tween] = []
 var tw_h: List[tw.Tween] = []
+
+var screen_x: List[Float] = []
+var screen_y: List[Float] = []
+var screen_s: List[Float] = []
+var screen_o: List[Float] = []
+
+var cam_angle: tw.Tween = tw.create(0.0, 0.0, 1.0)
+var cam_pitch: tw.Tween = tw.create(0.0, 0.0, 1.0)
+var cam_zoom: tw.Tween = tw.create(400.0, 400.0, 1.0)
+var cam_active = 0
+
+var vw = 600.0
+var vh = 600.0
 
 fn reset() -> Unit = {
   xs = [] ys = [] scales = [] opacities = [] hues = []
@@ -27,6 +40,7 @@ fn reset() -> Unit = {
   screen_x = [] screen_y = [] screen_s = [] screen_o = []
   active_count = 0
   cam_active = 0
+  morph_active = 0
 }
 
 fn add(x0: Float, y0: Float, x1: Float, y1: Float,
@@ -35,26 +49,138 @@ fn add(x0: Float, y0: Float, x1: Float, y1: Float,
        e: Int) -> Unit = {
   xs = xs + [x0] ys = ys + [y0] scales = scales + [s0]
   opacities = opacities + [o0] hues = hues + [h0]
-
   tw_x = tw_x + [tw.create(x0, x1, dur) |> tw.with_easing(e) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
   tw_y = tw_y + [tw.create(y0, y1, dur) |> tw.with_easing(e) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
   tw_s = tw_s + [tw.create(s0, s1, dur) |> tw.with_easing(e) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
   tw_o = tw_o + [tw.create(o0, o1, dur) |> tw.with_easing(ease.OUT_CUBIC) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
   tw_h = tw_h + [tw.create(h0, h1, dur) |> tw.with_easing(ease.IN_OUT_SINE) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
-
   active_count = active_count + 1
 }
 
-// ── Scenes ──
-
-var vw = 600.0
-var vh = 600.0
-
 @export(wasm, "set_size")
-fn set_size(w: Float, h: Float) -> Unit = {
-  vw = w
-  vh = h
+fn set_size(w: Float, h: Float) -> Unit = { vw = w; vh = h }
+
+// ══════════════════════════════════════════════════════════════
+// Morph scene — particles transition between shapes on click
+// ══════════════════════════════════════════════════════════════
+
+let MORPH_N = 200
+var morph_active = 0
+var morph_shape = 0
+var morph_cx = 300.0
+var morph_cy = 300.0
+
+// Shape generators: return (x, y) for particle i of N
+
+fn shape_circle(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } = {
+  let angle = int.to_float(i) / int.to_float(n) * 6.2832
+  { x: cx + math.cos(angle) * r, y: cy + math.sin(angle) * r }
 }
+
+fn shape_square(i: Int, n: Int, cx: Float, cy: Float, size: Float) -> { x: Float, y: Float } = {
+  let half = size / 2.0
+  let perimeter = size * 4.0
+  let t = int.to_float(i) / int.to_float(n) * perimeter
+  if t < size then { x: cx - half + t, y: cy - half }
+  else if t < size * 2.0 then { x: cx + half, y: cy - half + (t - size) }
+  else if t < size * 3.0 then { x: cx + half - (t - size * 2.0), y: cy + half }
+  else { x: cx - half, y: cy + half - (t - size * 3.0) }
+}
+
+fn shape_star(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } = {
+  let points = 5
+  let angle = int.to_float(i) / int.to_float(n) * 6.2832 - 1.5708
+  let point_idx = int.to_float(i % (n / points))
+  let segment_t = point_idx / int.to_float(n / points)
+  let seg = i / (n / points)
+  let a1 = int.to_float(seg) / int.to_float(points) * 6.2832 - 1.5708
+  let a2 = (int.to_float(seg) + 0.5) / int.to_float(points) * 6.2832 - 1.5708
+  let a3 = int.to_float(seg + 1) / int.to_float(points) * 6.2832 - 1.5708
+  let outer = r
+  let inner = r * 0.4
+  if segment_t < 0.5 then {
+    let t = segment_t * 2.0
+    let x1 = cx + math.cos(a1) * outer
+    let y1 = cy + math.sin(a1) * outer
+    let x2 = cx + math.cos(a2) * inner
+    let y2 = cy + math.sin(a2) * inner
+    { x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t }
+  } else {
+    let t = (segment_t - 0.5) * 2.0
+    let x1 = cx + math.cos(a2) * inner
+    let y1 = cy + math.sin(a2) * inner
+    let x2 = cx + math.cos(a3) * outer
+    let y2 = cy + math.sin(a3) * outer
+    { x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t }
+  }
+}
+
+fn shape_spiral(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } = {
+  let t = int.to_float(i) / int.to_float(n)
+  let angle = t * 6.2832 * 3.0
+  let dist = t * r
+  { x: cx + math.cos(angle) * dist, y: cy + math.sin(angle) * dist }
+}
+
+fn shape_random(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } = {
+  // Deterministic pseudo-random from index
+  let a = int.to_float((i * 7919 + 104729) % 10000) / 10000.0
+  let b = int.to_float((i * 6271 + 37813) % 10000) / 10000.0
+  { x: cx + (a - 0.5) * r * 2.0, y: cy + (b - 0.5) * r * 2.0 }
+}
+
+fn get_shape_pos(shape: Int, i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } =
+  if shape == 0 then shape_circle(i, n, cx, cy, r)
+  else if shape == 1 then shape_square(i, n, cx, cy, r * 1.6)
+  else if shape == 2 then shape_star(i, n, cx, cy, r)
+  else if shape == 3 then shape_spiral(i, n, cx, cy, r)
+  else shape_random(i, n, cx, cy, r)
+
+@export(wasm, "scene_morph")
+fn scene_morph() -> Unit = {
+  reset()
+  morph_active = 1
+  morph_cx = vw / 2.0
+  morph_cy = vh / 2.0
+  morph_shape = 0
+  let r = float.min(vw, vh) * 0.35
+  for i in 0..MORPH_N {
+    let p = shape_circle(i, MORPH_N, morph_cx, morph_cy, r)
+    let hue = int.to_float(i) / int.to_float(MORPH_N) * 360.0
+    xs = xs + [p.x] ys = ys + [p.y] scales = scales + [1.0]
+    opacities = opacities + [1.0] hues = hues + [hue]
+    // Initial: no movement (static circle)
+    tw_x = tw_x + [tw.create(p.x, p.x, 1000.0)]
+    tw_y = tw_y + [tw.create(p.y, p.y, 1000.0)]
+    tw_s = tw_s + [tw.create(1.0, 1.0, 1000.0)]
+    tw_o = tw_o + [tw.create(1.0, 1.0, 1000.0)]
+    tw_h = tw_h + [tw.create(hue, hue + 60.0, 3000.0) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
+    active_count = active_count + 1
+  }
+}
+
+@export(wasm, "morph_next")
+fn morph_next() -> Unit = {
+  if morph_active == 0 then () else {
+    morph_shape = (morph_shape + 1) % 5
+    let r = float.min(vw, vh) * 0.35
+    for i in 0..MORPH_N {
+      let target = get_shape_pos(morph_shape, i, MORPH_N, morph_cx, morph_cy, r)
+      let delay = stag.from_center(i, MORPH_N, 3.0)
+      tw_x[i] = tw.create(xs[i], target.x, 1200.0) |> tw.with_easing(ease.OUT_ELASTIC) |> tw.with_delay(delay)
+      tw_y[i] = tw.create(ys[i], target.y, 1200.0) |> tw.with_easing(ease.OUT_ELASTIC) |> tw.with_delay(delay)
+      tw_s[i] = tw.create(0.3, 1.0, 800.0) |> tw.with_easing(ease.OUT_BACK) |> tw.with_delay(delay)
+      tw_o[i] = tw.create(0.2, 1.0, 600.0) |> tw.with_easing(ease.OUT_CUBIC) |> tw.with_delay(delay)
+    }
+  }
+}
+
+@export(wasm, "get_morph_shape")
+fn get_morph_shape() -> Int = morph_shape
+
+// ══════════════════════════════════════════════════════════════
+// Classic scenes
+// ══════════════════════════════════════════════════════════════
 
 @export(wasm, "scene_easing")
 fn scene_easing() -> Unit = {
@@ -69,8 +195,7 @@ fn scene_easing() -> Unit = {
   let row_h = (vh - 60.0) / 10.0
   for i in 0..10 {
     let y = 50.0 + int.to_float(i) * row_h
-    add(margin, y, right, y,
-        1.0, 1.0, 1.0, 1.0,
+    add(margin, y, right, y, 1.0, 1.0, 1.0, 1.0,
         int.to_float(i * 36), int.to_float(i * 36),
         1200.0, int.to_float(i) * 80.0, easings[i])
   }
@@ -90,9 +215,7 @@ fn scene_grid() -> Unit = {
     let cx = ox + int.to_float(col) * gap + gap / 2.0
     let cy = oy + int.to_float(row) * gap + gap / 2.0
     let delay = stag.from_center(col, grid, 60.0) + stag.from_center(row, grid, 60.0)
-    add(cx, cy, cx, cy,
-        0.15, 1.0, 0.1, 1.0,
-        220.0, 340.0,
+    add(cx, cy, cx, cy, 0.15, 1.0, 0.1, 1.0, 220.0, 340.0,
         800.0, delay, ease.OUT_ELASTIC)
   }
 }
@@ -111,8 +234,7 @@ fn scene_fireworks() -> Unit = {
     let target_x = cx + math.cos(angle) * dist
     let target_y = cy + math.sin(angle) * dist
     let delay = stag.from_center(i % 12, 12, 40.0) + stag.from_center(i / 12, 12, 40.0)
-    add(cx, cy, target_x, target_y,
-        0.0, 1.0, 0.0, 1.0,
+    add(cx, cy, target_x, target_y, 0.0, 1.0, 0.0, 1.0,
         int.to_float(i) * 2.5, int.to_float(i) * 2.5 + 60.0,
         1000.0, delay, ease.OUT_ELASTIC)
   }
@@ -129,17 +251,14 @@ fn scene_wave() -> Unit = {
     let x = 20.0 + int.to_float(i) * bar_w
     let delay = int.to_float(i) * 25.0
     let hue_start = 200.0 + int.to_float(i) / int.to_float(n) * 160.0
-    add(x, base_y, x, base_y - amp,
-        1.0, 1.0, 0.3, 1.0,
-        hue_start, hue_start + 40.0,
-        600.0, delay, ease.OUT_QUART)
+    add(x, base_y, x, base_y - amp, 1.0, 1.0, 0.3, 1.0,
+        hue_start, hue_start + 40.0, 600.0, delay, ease.OUT_QUART)
   }
 }
 
 @export(wasm, "scene_camera")
 fn scene_camera() -> Unit = {
   reset()
-  // 3D grid: 6×6×3 = 108 points
   let gx = 6
   let gy = 6
   let gz = 3
@@ -148,79 +267,30 @@ fn scene_camera() -> Unit = {
     for iy in 0..gy {
       for ix in 0..gx {
         let idx = iz * gx * gy + iy * gx + ix
-        // 3D position centered at origin
         let px = (int.to_float(ix) - 2.5) * spacing
         let py = (int.to_float(iy) - 2.5) * spacing
         let pz = (int.to_float(iz) - 1.0) * spacing
-        // Store 3D coords in x/y, z in scale (repurposed)
-        // We'll compute projection in update_camera
-        xs = xs + [px]
-        ys = ys + [py]
-        scales = scales + [pz]  // z coord stored here
-        opacities = opacities + [1.0]
-        hues = hues + [200.0 + int.to_float(idx) * 1.5]
-        // Dummy tweens (camera handles animation, not per-element tweens)
-        let t0 = tw.create(0.0, 0.0, 1000.0)
-        let t1 = tw.looping(t0)
-        tw_x = tw_x + [t1]
-        tw_y = tw_y + [t1]
-        tw_s = tw_s + [t1]
-        tw_o = tw_o + [t1]
-        tw_h = tw_h + [t1]
+        xs = xs + [px] ys = ys + [py] scales = scales + [pz]
+        opacities = opacities + [1.0] hues = hues + [200.0 + int.to_float(idx) * 1.5]
+        let t0 = tw.create(0.0, 0.0, 1000.0) |> tw.looping
+        tw_x = tw_x + [t0] tw_y = tw_y + [t0] tw_s = tw_s + [t0] tw_o = tw_o + [t0] tw_h = tw_h + [t0]
         active_count = active_count + 1
       }
     }
   }
-  // Camera tweens stored separately
-  cam_angle = tw.create(0.0, 6.2832, 8000.0)
-  let ca1 = tw.with_easing(cam_angle, ease.IN_OUT_SINE)
-  let ca2 = tw.looping(ca1)
-  cam_angle = ca2
-  cam_pitch = tw.create(0.3, 0.0 - 0.3, 4000.0)
-  let cp1 = tw.with_easing(cam_pitch, ease.IN_OUT_QUAD)
-  let cp2 = tw.looping(cp1)
-  let cp3 = tw.with_direction(cp2, tw.ALTERNATE)
-  cam_pitch = cp3
-  cam_zoom = tw.create(400.0, 250.0, 6000.0)
-  let cz1 = tw.with_easing(cam_zoom, ease.IN_OUT_CUBIC)
-  let cz2 = tw.looping(cz1)
-  let cz3 = tw.with_direction(cz2, tw.ALTERNATE)
-  cam_zoom = cz3
+  cam_angle = tw.create(0.0, 6.2832, 8000.0) |> tw.with_easing(ease.IN_OUT_SINE) |> tw.looping
+  cam_pitch = tw.create(0.3, 0.0 - 0.3, 4000.0) |> tw.with_easing(ease.IN_OUT_QUAD) |> tw.looping |> tw.with_direction(tw.ALTERNATE)
+  cam_zoom = tw.create(400.0, 250.0, 6000.0) |> tw.with_easing(ease.IN_OUT_CUBIC) |> tw.looping |> tw.with_direction(tw.ALTERNATE)
   cam_active = 1
 }
 
-var cam_angle: tw.Tween = tw.create(0.0, 0.0, 1.0)
-var cam_pitch: tw.Tween = tw.create(0.0, 0.0, 1.0)
-var cam_zoom: tw.Tween = tw.create(400.0, 400.0, 1.0)
-var cam_active = 0
-
-// Screen-projected coordinates (written by update)
-var screen_x: List[Float] = []
-var screen_y: List[Float] = []
-var screen_s: List[Float] = []  // projected size
-var screen_o: List[Float] = []  // depth-based opacity
-
-@export(wasm, "get_sx")
-fn get_sx(i: Int) -> Float = screen_x[i]
-
-@export(wasm, "get_sy")
-fn get_sy(i: Int) -> Float = screen_y[i]
-
-@export(wasm, "get_ss")
-fn get_ss(i: Int) -> Float = screen_s[i]
-
-@export(wasm, "get_so")
-fn get_so(i: Int) -> Float = screen_o[i]
-
-@export(wasm, "is_camera")
-fn is_camera() -> Int = cam_active
-
-// ── Tick ──
+// ══════════════════════════════════════════════════════════════
+// Update
+// ══════════════════════════════════════════════════════════════
 
 @export(wasm, "update")
 fn update(dt_ms: Float) -> Unit = {
   if cam_active == 1 then {
-    // Camera mode: tick camera tweens, project 3D → 2D
     cam_angle = tw.tick(cam_angle, dt_ms)
     cam_pitch = tw.tick(cam_pitch, dt_ms)
     cam_zoom = tw.tick(cam_zoom, dt_ms)
@@ -230,40 +300,24 @@ fn update(dt_ms: Float) -> Unit = {
     let focal = float.min(vw, vh) * 0.8
     let screen_cx = vw / 2.0
     let screen_cy = vh / 2.0
-    // Camera position on orbit
     let cam_x = math.cos(angle) * dist
     let cam_y = math.sin(pitch) * dist
     let cam_z = math.sin(angle) * dist
-    // Rebuild screen arrays
-    screen_x = []
-    screen_y = []
-    screen_s = []
-    screen_o = []
+    screen_x = [] screen_y = [] screen_s = [] screen_o = []
     for i in 0..active_count {
-      let px = xs[i]
-      let py = ys[i]
-      let pz = scales[i]  // z stored in scales
-      // Rotate point relative to camera (simplified orbit: yaw only for x/z)
-      let dx = px - cam_x
-      let dy = py - cam_y
-      let dz = pz - cam_z
-      // View-space: rotate by -angle around Y axis
+      let dx = xs[i] - cam_x
+      let dy = ys[i] - cam_y
+      let dz = scales[i] - cam_z
       let cos_a = math.cos(0.0 - angle)
       let sin_a = math.sin(0.0 - angle)
       let vx = dx * cos_a + dz * sin_a
       let vz = 0.0 - dx * sin_a + dz * cos_a
-      let vy = dy
-      // Perspective projection
       let depth = vz + focal
       if depth > 10.0 then {
-        let proj_x = screen_cx + vx * focal / depth
-        let proj_y = screen_cy + vy * focal / depth
-        let proj_s = focal / depth * 12.0
-        let proj_o = float.min(1.0, float.max(0.1, 1.0 - vz / 600.0))
-        screen_x = screen_x + [proj_x]
-        screen_y = screen_y + [proj_y]
-        screen_s = screen_s + [proj_s]
-        screen_o = screen_o + [proj_o]
+        screen_x = screen_x + [screen_cx + vx * focal / depth]
+        screen_y = screen_y + [screen_cy + dy * focal / depth]
+        screen_s = screen_s + [focal / depth * 12.0]
+        screen_o = screen_o + [float.min(1.0, float.max(0.1, 1.0 - vz / 600.0))]
       } else {
         screen_x = screen_x + [0.0 - 100.0]
         screen_y = screen_y + [0.0 - 100.0]
@@ -272,7 +326,6 @@ fn update(dt_ms: Float) -> Unit = {
       }
     }
   } else {
-    // Normal mode: tick per-element tweens
     for i in 0..active_count {
       tw_x[i] = tw.tick(tw_x[i], dt_ms)
       tw_y[i] = tw.tick(tw_y[i], dt_ms)
@@ -288,7 +341,9 @@ fn update(dt_ms: Float) -> Unit = {
   }
 }
 
-// ── Accessors ──
+// ══════════════════════════════════════════════════════════════
+// Accessors
+// ══════════════════════════════════════════════════════════════
 
 @export(wasm, "get_count")
 fn get_count() -> Int = active_count
@@ -307,3 +362,18 @@ fn get_opacity(i: Int) -> Float = opacities[i]
 
 @export(wasm, "get_hue")
 fn get_hue(i: Int) -> Float = hues[i]
+
+@export(wasm, "get_sx")
+fn get_sx(i: Int) -> Float = screen_x[i]
+
+@export(wasm, "get_sy")
+fn get_sy(i: Int) -> Float = screen_y[i]
+
+@export(wasm, "get_ss")
+fn get_ss(i: Int) -> Float = screen_s[i]
+
+@export(wasm, "get_so")
+fn get_so(i: Int) -> Float = screen_o[i]
+
+@export(wasm, "is_camera")
+fn is_camera() -> Int = cam_active
