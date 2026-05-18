@@ -36,40 +36,11 @@ fn add(x0: Float, y0: Float, x1: Float, y1: Float,
   xs = xs + [x0] ys = ys + [y0] scales = scales + [s0]
   opacities = opacities + [o0] hues = hues + [h0]
 
-  let tx = tw.create(x0, x1, dur)
-  let tx1 = tw.with_easing(tx, e)
-  let tx2 = tw.with_delay(tx1, delay)
-  let tx3 = tw.looping(tx2)
-  let tx4 = tw.with_direction(tx3, tw.ALTERNATE)
-  tw_x = tw_x + [tx4]
-
-  let ty = tw.create(y0, y1, dur)
-  let ty1 = tw.with_easing(ty, e)
-  let ty2 = tw.with_delay(ty1, delay)
-  let ty3 = tw.looping(ty2)
-  let ty4 = tw.with_direction(ty3, tw.ALTERNATE)
-  tw_y = tw_y + [ty4]
-
-  let ts = tw.create(s0, s1, dur)
-  let ts1 = tw.with_easing(ts, e)
-  let ts2 = tw.with_delay(ts1, delay)
-  let ts3 = tw.looping(ts2)
-  let ts4 = tw.with_direction(ts3, tw.ALTERNATE)
-  tw_s = tw_s + [ts4]
-
-  let to = tw.create(o0, o1, dur)
-  let to1 = tw.with_easing(to, ease.OUT_CUBIC)
-  let to2 = tw.with_delay(to1, delay)
-  let to3 = tw.looping(to2)
-  let to4 = tw.with_direction(to3, tw.ALTERNATE)
-  tw_o = tw_o + [to4]
-
-  let th = tw.create(h0, h1, dur)
-  let th1 = tw.with_easing(th, ease.IN_OUT_SINE)
-  let th2 = tw.with_delay(th1, delay)
-  let th3 = tw.looping(th2)
-  let th4 = tw.with_direction(th3, tw.ALTERNATE)
-  tw_h = tw_h + [th4]
+  tw_x = tw_x + [tw.create(x0, x1, dur) |> tw.with_easing(e) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
+  tw_y = tw_y + [tw.create(y0, y1, dur) |> tw.with_easing(e) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
+  tw_s = tw_s + [tw.create(s0, s1, dur) |> tw.with_easing(e) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
+  tw_o = tw_o + [tw.create(o0, o1, dur) |> tw.with_easing(ease.OUT_CUBIC) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
+  tw_h = tw_h + [tw.create(h0, h1, dur) |> tw.with_easing(ease.IN_OUT_SINE) |> tw.with_delay(delay) |> tw.looping |> tw.with_direction(tw.ALTERNATE)]
 
   active_count = active_count + 1
 }
