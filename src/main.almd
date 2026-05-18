@@ -1,0 +1,338 @@
+// ceangal-anime demo — all animation logic in WASM
+
+import self.easing as ease
+import self.tween as tw
+import self.stagger as stag
+import math
+
+// ── Shared ──
+let MAX = 256
+var xs: List[Float] = []      // current x position
+var ys: List[Float] = []      // current y position
+var scales: List[Float] = []  // current scale
+var opacities: List[Float] = []
+var hues: List[Float] = []
+var active_count = 0
+
+// Each property can have its own tween
+var tw_x: List[tw.Tween] = []
+var tw_y: List[tw.Tween] = []
+var tw_s: List[tw.Tween] = []
+var tw_o: List[tw.Tween] = []
+var tw_h: List[tw.Tween] = []
+
+fn reset() -> Unit = {
+  xs = [] ys = [] scales = [] opacities = [] hues = []
+  tw_x = [] tw_y = [] tw_s = [] tw_o = [] tw_h = []
+  screen_x = [] screen_y = [] screen_s = [] screen_o = []
+  active_count = 0
+  cam_active = 0
+}
+
+fn add(x0: Float, y0: Float, x1: Float, y1: Float,
+       s0: Float, s1: Float, o0: Float, o1: Float,
+       h0: Float, h1: Float, dur: Float, delay: Float,
+       e: Int) -> Unit = {
+  xs = xs + [x0] ys = ys + [y0] scales = scales + [s0]
+  opacities = opacities + [o0] hues = hues + [h0]
+
+  let tx = tw.create(x0, x1, dur)
+  let tx1 = tw.with_easing(tx, e)
+  let tx2 = tw.with_delay(tx1, delay)
+  let tx3 = tw.looping(tx2)
+  let tx4 = tw.with_direction(tx3, tw.ALTERNATE)
+  tw_x = tw_x + [tx4]
+
+  let ty = tw.create(y0, y1, dur)
+  let ty1 = tw.with_easing(ty, e)
+  let ty2 = tw.with_delay(ty1, delay)
+  let ty3 = tw.looping(ty2)
+  let ty4 = tw.with_direction(ty3, tw.ALTERNATE)
+  tw_y = tw_y + [ty4]
+
+  let ts = tw.create(s0, s1, dur)
+  let ts1 = tw.with_easing(ts, e)
+  let ts2 = tw.with_delay(ts1, delay)
+  let ts3 = tw.looping(ts2)
+  let ts4 = tw.with_direction(ts3, tw.ALTERNATE)
+  tw_s = tw_s + [ts4]
+
+  let to = tw.create(o0, o1, dur)
+  let to1 = tw.with_easing(to, ease.OUT_CUBIC)
+  let to2 = tw.with_delay(to1, delay)
+  let to3 = tw.looping(to2)
+  let to4 = tw.with_direction(to3, tw.ALTERNATE)
+  tw_o = tw_o + [to4]
+
+  let th = tw.create(h0, h1, dur)
+  let th1 = tw.with_easing(th, ease.IN_OUT_SINE)
+  let th2 = tw.with_delay(th1, delay)
+  let th3 = tw.looping(th2)
+  let th4 = tw.with_direction(th3, tw.ALTERNATE)
+  tw_h = tw_h + [th4]
+
+  active_count = active_count + 1
+}
+
+// ── Scenes ──
+
+var vw = 600.0
+var vh = 600.0
+
+@export(wasm, "set_size")
+fn set_size(w: Float, h: Float) -> Unit = {
+  vw = w
+  vh = h
+}
+
+@export(wasm, "scene_easing")
+fn scene_easing() -> Unit = {
+  reset()
+  let easings = [
+    ease.LINEAR, ease.OUT_CUBIC, ease.IN_OUT_QUAD, ease.OUT_ELASTIC,
+    ease.OUT_BOUNCE, ease.IN_OUT_BACK, ease.OUT_EXPO, ease.IN_OUT_SINE,
+    ease.OUT_QUART, ease.IN_CIRC,
+  ]
+  let margin = vw * 0.2
+  let right = vw - 40.0
+  let row_h = (vh - 60.0) / 10.0
+  for i in 0..10 {
+    let y = 50.0 + int.to_float(i) * row_h
+    add(margin, y, right, y,
+        1.0, 1.0, 1.0, 1.0,
+        int.to_float(i * 36), int.to_float(i * 36),
+        1200.0, int.to_float(i) * 80.0, easings[i])
+  }
+}
+
+@export(wasm, "scene_grid")
+fn scene_grid() -> Unit = {
+  reset()
+  let grid = 12
+  let size = float.min(vw, vh - 50.0)
+  let gap = size / int.to_float(grid)
+  let ox = (vw - size) / 2.0
+  let oy = 50.0
+  for i in 0..(grid * grid) {
+    let col = i % grid
+    let row = i / grid
+    let cx = ox + int.to_float(col) * gap + gap / 2.0
+    let cy = oy + int.to_float(row) * gap + gap / 2.0
+    let delay = stag.from_center(col, grid, 60.0) + stag.from_center(row, grid, 60.0)
+    add(cx, cy, cx, cy,
+        0.15, 1.0, 0.1, 1.0,
+        220.0, 340.0,
+        800.0, delay, ease.OUT_ELASTIC)
+  }
+}
+
+@export(wasm, "scene_fireworks")
+fn scene_fireworks() -> Unit = {
+  reset()
+  let n = 144
+  let cx = vw / 2.0
+  let cy = vh / 2.0 + 10.0
+  let radius = float.min(vw, vh) * 0.4
+  for i in 0..n {
+    let angle = int.to_float(i) / int.to_float(n) * 6.2832 + int.to_float(i / 12) * 0.5
+    let ring = int.to_float(i % 12) / 12.0
+    let dist = radius * 0.15 + ring * radius * 0.85
+    let target_x = cx + math.cos(angle) * dist
+    let target_y = cy + math.sin(angle) * dist
+    let delay = stag.from_center(i % 12, 12, 40.0) + stag.from_center(i / 12, 12, 40.0)
+    add(cx, cy, target_x, target_y,
+        0.0, 1.0, 0.0, 1.0,
+        int.to_float(i) * 2.5, int.to_float(i) * 2.5 + 60.0,
+        1000.0, delay, ease.OUT_ELASTIC)
+  }
+}
+
+@export(wasm, "scene_wave")
+fn scene_wave() -> Unit = {
+  reset()
+  let n = int.max(20, float.to_int(vw / 8.0))
+  let bar_w = (vw - 40.0) / int.to_float(n)
+  let base_y = vh * 0.6
+  let amp = vh * 0.35
+  for i in 0..n {
+    let x = 20.0 + int.to_float(i) * bar_w
+    let delay = int.to_float(i) * 25.0
+    let hue_start = 200.0 + int.to_float(i) / int.to_float(n) * 160.0
+    add(x, base_y, x, base_y - amp,
+        1.0, 1.0, 0.3, 1.0,
+        hue_start, hue_start + 40.0,
+        600.0, delay, ease.OUT_QUART)
+  }
+}
+
+@export(wasm, "scene_camera")
+fn scene_camera() -> Unit = {
+  reset()
+  // 3D grid: 6×6×3 = 108 points
+  let gx = 6
+  let gy = 6
+  let gz = 3
+  let spacing = 60.0
+  for iz in 0..gz {
+    for iy in 0..gy {
+      for ix in 0..gx {
+        let idx = iz * gx * gy + iy * gx + ix
+        // 3D position centered at origin
+        let px = (int.to_float(ix) - 2.5) * spacing
+        let py = (int.to_float(iy) - 2.5) * spacing
+        let pz = (int.to_float(iz) - 1.0) * spacing
+        // Store 3D coords in x/y, z in scale (repurposed)
+        // We'll compute projection in update_camera
+        xs = xs + [px]
+        ys = ys + [py]
+        scales = scales + [pz]  // z coord stored here
+        opacities = opacities + [1.0]
+        hues = hues + [200.0 + int.to_float(idx) * 1.5]
+        // Dummy tweens (camera handles animation, not per-element tweens)
+        let t0 = tw.create(0.0, 0.0, 1000.0)
+        let t1 = tw.looping(t0)
+        tw_x = tw_x + [t1]
+        tw_y = tw_y + [t1]
+        tw_s = tw_s + [t1]
+        tw_o = tw_o + [t1]
+        tw_h = tw_h + [t1]
+        active_count = active_count + 1
+      }
+    }
+  }
+  // Camera tweens stored separately
+  cam_angle = tw.create(0.0, 6.2832, 8000.0)
+  let ca1 = tw.with_easing(cam_angle, ease.IN_OUT_SINE)
+  let ca2 = tw.looping(ca1)
+  cam_angle = ca2
+  cam_pitch = tw.create(0.3, 0.0 - 0.3, 4000.0)
+  let cp1 = tw.with_easing(cam_pitch, ease.IN_OUT_QUAD)
+  let cp2 = tw.looping(cp1)
+  let cp3 = tw.with_direction(cp2, tw.ALTERNATE)
+  cam_pitch = cp3
+  cam_zoom = tw.create(400.0, 250.0, 6000.0)
+  let cz1 = tw.with_easing(cam_zoom, ease.IN_OUT_CUBIC)
+  let cz2 = tw.looping(cz1)
+  let cz3 = tw.with_direction(cz2, tw.ALTERNATE)
+  cam_zoom = cz3
+  cam_active = 1
+}
+
+var cam_angle: tw.Tween = tw.create(0.0, 0.0, 1.0)
+var cam_pitch: tw.Tween = tw.create(0.0, 0.0, 1.0)
+var cam_zoom: tw.Tween = tw.create(400.0, 400.0, 1.0)
+var cam_active = 0
+
+// Screen-projected coordinates (written by update)
+var screen_x: List[Float] = []
+var screen_y: List[Float] = []
+var screen_s: List[Float] = []  // projected size
+var screen_o: List[Float] = []  // depth-based opacity
+
+@export(wasm, "get_sx")
+fn get_sx(i: Int) -> Float = screen_x[i]
+
+@export(wasm, "get_sy")
+fn get_sy(i: Int) -> Float = screen_y[i]
+
+@export(wasm, "get_ss")
+fn get_ss(i: Int) -> Float = screen_s[i]
+
+@export(wasm, "get_so")
+fn get_so(i: Int) -> Float = screen_o[i]
+
+@export(wasm, "is_camera")
+fn is_camera() -> Int = cam_active
+
+// ── Tick ──
+
+@export(wasm, "update")
+fn update(dt_ms: Float) -> Unit = {
+  if cam_active == 1 then {
+    // Camera mode: tick camera tweens, project 3D → 2D
+    cam_angle = tw.tick(cam_angle, dt_ms)
+    cam_pitch = tw.tick(cam_pitch, dt_ms)
+    cam_zoom = tw.tick(cam_zoom, dt_ms)
+    let angle = tw.value(cam_angle)
+    let pitch = tw.value(cam_pitch)
+    let dist = tw.value(cam_zoom)
+    let focal = float.min(vw, vh) * 0.8
+    let screen_cx = vw / 2.0
+    let screen_cy = vh / 2.0
+    // Camera position on orbit
+    let cam_x = math.cos(angle) * dist
+    let cam_y = math.sin(pitch) * dist
+    let cam_z = math.sin(angle) * dist
+    // Rebuild screen arrays
+    screen_x = []
+    screen_y = []
+    screen_s = []
+    screen_o = []
+    for i in 0..active_count {
+      let px = xs[i]
+      let py = ys[i]
+      let pz = scales[i]  // z stored in scales
+      // Rotate point relative to camera (simplified orbit: yaw only for x/z)
+      let dx = px - cam_x
+      let dy = py - cam_y
+      let dz = pz - cam_z
+      // View-space: rotate by -angle around Y axis
+      let cos_a = math.cos(0.0 - angle)
+      let sin_a = math.sin(0.0 - angle)
+      let vx = dx * cos_a + dz * sin_a
+      let vz = 0.0 - dx * sin_a + dz * cos_a
+      let vy = dy
+      // Perspective projection
+      let depth = vz + focal
+      if depth > 10.0 then {
+        let proj_x = screen_cx + vx * focal / depth
+        let proj_y = screen_cy + vy * focal / depth
+        let proj_s = focal / depth * 12.0
+        let proj_o = float.min(1.0, float.max(0.1, 1.0 - vz / 600.0))
+        screen_x = screen_x + [proj_x]
+        screen_y = screen_y + [proj_y]
+        screen_s = screen_s + [proj_s]
+        screen_o = screen_o + [proj_o]
+      } else {
+        screen_x = screen_x + [0.0 - 100.0]
+        screen_y = screen_y + [0.0 - 100.0]
+        screen_s = screen_s + [0.0]
+        screen_o = screen_o + [0.0]
+      }
+    }
+  } else {
+    // Normal mode: tick per-element tweens
+    for i in 0..active_count {
+      tw_x[i] = tw.tick(tw_x[i], dt_ms)
+      tw_y[i] = tw.tick(tw_y[i], dt_ms)
+      tw_s[i] = tw.tick(tw_s[i], dt_ms)
+      tw_o[i] = tw.tick(tw_o[i], dt_ms)
+      tw_h[i] = tw.tick(tw_h[i], dt_ms)
+      xs[i] = tw.value(tw_x[i])
+      ys[i] = tw.value(tw_y[i])
+      scales[i] = tw.value(tw_s[i])
+      opacities[i] = tw.value(tw_o[i])
+      hues[i] = tw.value(tw_h[i])
+    }
+  }
+}
+
+// ── Accessors ──
+
+@export(wasm, "get_count")
+fn get_count() -> Int = active_count
+
+@export(wasm, "get_x")
+fn get_x(i: Int) -> Float = xs[i]
+
+@export(wasm, "get_y")
+fn get_y(i: Int) -> Float = ys[i]
+
+@export(wasm, "get_scale")
+fn get_scale(i: Int) -> Float = scales[i]
+
+@export(wasm, "get_opacity")
+fn get_opacity(i: Int) -> Float = opacities[i]
+
+@export(wasm, "get_hue")
+fn get_hue(i: Int) -> Float = hues[i]

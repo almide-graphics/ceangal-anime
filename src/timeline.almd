@@ -1,0 +1,96 @@
+// ceangal-anime timeline — sequence and parallel animation orchestration
+
+import self.tween as tw
+
+type Entry = {
+  tween: tw.Tween,
+  offset: Float,
+}
+
+type Timeline = {
+  entries: List[Entry],
+  elapsed: Float,
+  state: Int,
+}
+
+fn create() -> Timeline = {
+  entries: [], elapsed: 0.0, state: tw.RUNNING,
+}
+
+fn add(tl: Timeline, tween: tw.Tween, offset: Float) -> Timeline =
+  { ...tl, entries: tl.entries + [{ tween: tween, offset: offset }] }
+
+fn sequence(tl: Timeline, tween: tw.Tween) -> Timeline =
+  add(tl, tween, duration(tl))
+
+fn parallel(tl: Timeline, tween: tw.Tween) -> Timeline = {
+  let last_offset = if list.len(tl.entries) > 0 then
+    tl.entries[list.len(tl.entries) - 1].offset
+  else 0.0
+  add(tl, tween, last_offset)
+}
+
+fn entry_end(e: Entry) -> Float = e.offset + e.tween.delay + e.tween.duration
+
+fn duration(tl: Timeline) -> Float = {
+  var max_end = 0.0
+  for e in tl.entries {
+    let end = entry_end(e)
+    if end > max_end then { max_end = end } else ()
+  }
+  max_end
+}
+
+fn tick(tl: Timeline, dt_ms: Float) -> Timeline = {
+  if tl.state != tw.RUNNING then tl
+  else {
+    let new_elapsed = tl.elapsed + dt_ms
+    var new_entries: List[Entry] = []
+    var done_count = 0
+    let total = list.len(tl.entries)
+    for e in tl.entries {
+      let prev_local = tl.elapsed - e.offset
+      let new_local = new_elapsed - e.offset
+      if new_local > 0.0 then {
+        // Effective dt: clamp to time since this tween became active
+        let effective_dt = if prev_local < 0.0 then new_local else dt_ms
+        let updated = tw.tick(e.tween, effective_dt)
+        new_entries = new_entries + [{ tween: updated, offset: e.offset }]
+        if tw.is_finished(updated) then { done_count = done_count + 1 } else ()
+      } else {
+        new_entries = new_entries + [e]
+        ()
+      }
+    }
+    let new_state = if done_count == total and total > 0 then tw.FINISHED else tw.RUNNING
+    let result: Timeline = { entries: new_entries, elapsed: new_elapsed, state: new_state }
+    result
+  }
+}
+
+fn is_running(tl: Timeline) -> Bool = tl.state == tw.RUNNING
+fn is_finished(tl: Timeline) -> Bool = tl.state == tw.FINISHED
+
+fn value_at(tl: Timeline, index: Int) -> Float =
+  tw.value(tl.entries[index].tween)
+
+fn progress(tl: Timeline) -> Float = {
+  let d = duration(tl)
+  if d <= 0.0 then 1.0 else float.min(1.0, tl.elapsed / d)
+}
+
+fn pause(tl: Timeline) -> Timeline = { ...tl, state: tw.PAUSED }
+fn resume(tl: Timeline) -> Timeline = { ...tl, state: tw.RUNNING }
+
+fn reset(tl: Timeline) -> Timeline = {
+  var new_entries: List[Entry] = []
+  for e in tl.entries {
+    new_entries = new_entries + [{ tween: tw.reset(e.tween), offset: e.offset }]
+  }
+  { entries: new_entries, elapsed: 0.0, state: tw.RUNNING }
+}
+
+// ── Tests ──
+
+
+

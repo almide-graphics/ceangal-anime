@@ -1,0 +1,75 @@
+// ceangal-anime stagger — per-element delay/value offsets
+//
+// Stagger creates evenly (or eased) distributed offsets for N elements.
+// Used for cascading animations (e.g., list items appearing one by one).
+
+import self.easing as ease
+
+// ── Stagger offset calculation ──
+
+// Linear stagger: offset = index * step
+fn linear(index: Int, total: Int, step: Float) -> Float =
+  int.to_float(index) * step
+
+// Range stagger: distribute [start, end] across N elements
+fn range(index: Int, total: Int, start: Float, end: Float) -> Float = {
+  if total <= 1 then start
+  else {
+    let t = int.to_float(index) / int.to_float(total - 1)
+    start + (end - start) * t
+  }
+}
+
+// Eased stagger: like range but with easing curve
+fn eased(index: Int, total: Int, start: Float, end: Float, easing: Int) -> Float = {
+  if total <= 1 then start
+  else {
+    let t = int.to_float(index) / int.to_float(total - 1)
+    let et = ease.apply(easing, t)
+    start + (end - start) * et
+  }
+}
+
+// From-center stagger: elements in the middle start first (or last)
+fn from_center(index: Int, total: Int, step: Float) -> Float = {
+  if total <= 1 then 0.0
+  else {
+    let center = int.to_float(total - 1) / 2.0
+    let dist = float.abs(int.to_float(index) - center)
+    dist * step
+  }
+}
+
+// From-edges stagger: elements at edges start first
+fn from_edges(index: Int, total: Int, step: Float) -> Float = {
+  if total <= 1 then 0.0
+  else {
+    let center = int.to_float(total - 1) / 2.0
+    let max_dist = center
+    let dist = float.abs(int.to_float(index) - center)
+    (max_dist - dist) * step
+  }
+}
+
+// ── Convenience: generate delay list ──
+
+fn delays(total: Int, step: Float) -> List[Float] = {
+  var result: List[Float] = []
+  for i in 0..total {
+    result = result + [linear(i, total, step)]
+  }
+  result
+}
+
+fn delays_from_center(total: Int, step: Float) -> List[Float] = {
+  var result: List[Float] = []
+  for i in 0..total {
+    result = result + [from_center(i, total, step)]
+  }
+  result
+}
+
+// ── Tests ──
+
+
+
