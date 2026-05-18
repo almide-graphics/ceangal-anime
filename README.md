@@ -5,6 +5,10 @@
   Pure WASM. No DOM. No JS runtime dependency.
 </p>
 
+<p align="center">
+  <img src="assets/demo.gif" alt="ceangal-anime demo" width="480">
+</p>
+
 ---
 
 ## Modules
