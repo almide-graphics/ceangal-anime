@@ -243,7 +243,7 @@ fn scene_fireworks() -> Unit = {
 @export(wasm, "scene_wave")
 fn scene_wave() -> Unit = {
   reset()
-  let n = int.max(20, float.to_int(vw / 8.0))
+  let n = int.min(80, int.max(20, float.to_int(vw / 10.0)))
   let bar_w = (vw - 40.0) / int.to_float(n)
   let base_y = vh * 0.6
   let amp = vh * 0.35
