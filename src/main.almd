@@ -73,14 +73,14 @@ var morph_cy = 300.0
 // Shape generators: return (x, y) for particle i of N
 
 fn shape_circle(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } = {
-  let angle = int.to_float(i) / int.to_float(n) * 6.2832
+  let angle = float.from(i) / float.from(n) * 6.2832
   { x: cx + math.cos(angle) * r, y: cy + math.sin(angle) * r }
 }
 
 fn shape_square(i: Int, n: Int, cx: Float, cy: Float, size: Float) -> { x: Float, y: Float } = {
   let half = size / 2.0
   let perimeter = size * 4.0
-  let t = int.to_float(i) / int.to_float(n) * perimeter
+  let t = float.from(i) / float.from(n) * perimeter
   if t < size then { x: cx - half + t, y: cy - half }
   else if t < size * 2.0 then { x: cx + half, y: cy - half + (t - size) }
   else if t < size * 3.0 then { x: cx + half - (t - size * 2.0), y: cy + half }
@@ -89,13 +89,13 @@ fn shape_square(i: Int, n: Int, cx: Float, cy: Float, size: Float) -> { x: Float
 
 fn shape_star(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } = {
   let points = 5
-  let angle = int.to_float(i) / int.to_float(n) * 6.2832 - 1.5708
-  let point_idx = int.to_float(i % (n / points))
-  let segment_t = point_idx / int.to_float(n / points)
+  let angle = float.from(i) / float.from(n) * 6.2832 - 1.5708
+  let point_idx = float.from(i % (n / points))
+  let segment_t = point_idx / float.from(n / points)
   let seg = i / (n / points)
-  let a1 = int.to_float(seg) / int.to_float(points) * 6.2832 - 1.5708
-  let a2 = (int.to_float(seg) + 0.5) / int.to_float(points) * 6.2832 - 1.5708
-  let a3 = int.to_float(seg + 1) / int.to_float(points) * 6.2832 - 1.5708
+  let a1 = float.from(seg) / float.from(points) * 6.2832 - 1.5708
+  let a2 = (float.from(seg) + 0.5) / float.from(points) * 6.2832 - 1.5708
+  let a3 = float.from(seg + 1) / float.from(points) * 6.2832 - 1.5708
   let outer = r
   let inner = r * 0.4
   if segment_t < 0.5 then {
@@ -116,7 +116,7 @@ fn shape_star(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: 
 }
 
 fn shape_spiral(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } = {
-  let t = int.to_float(i) / int.to_float(n)
+  let t = float.from(i) / float.from(n)
   let angle = t * 6.2832 * 3.0
   let dist = t * r
   { x: cx + math.cos(angle) * dist, y: cy + math.sin(angle) * dist }
@@ -124,8 +124,8 @@ fn shape_spiral(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y
 
 fn shape_random(i: Int, n: Int, cx: Float, cy: Float, r: Float) -> { x: Float, y: Float } = {
   // Deterministic pseudo-random from index
-  let a = int.to_float((i * 7919 + 104729) % 10000) / 10000.0
-  let b = int.to_float((i * 6271 + 37813) % 10000) / 10000.0
+  let a = float.from((i * 7919 + 104729) % 10000) / 10000.0
+  let b = float.from((i * 6271 + 37813) % 10000) / 10000.0
   { x: cx + (a - 0.5) * r * 2.0, y: cy + (b - 0.5) * r * 2.0 }
 }
 
@@ -146,7 +146,7 @@ fn scene_morph() -> Unit = {
   let r = float.min(vw, vh) * 0.35
   for i in 0..MORPH_N {
     let p = shape_circle(i, MORPH_N, morph_cx, morph_cy, r)
-    let hue = int.to_float(i) / int.to_float(MORPH_N) * 360.0
+    let hue = float.from(i) / float.from(MORPH_N) * 360.0
     xs = xs + [p.x] ys = ys + [p.y] scales = scales + [1.0]
     opacities = opacities + [1.0] hues = hues + [hue]
     // Initial: no movement (static circle)
@@ -194,10 +194,10 @@ fn scene_easing() -> Unit = {
   let right = vw - 40.0
   let row_h = (vh - 60.0) / 10.0
   for i in 0..10 {
-    let y = 50.0 + int.to_float(i) * row_h
+    let y = 50.0 + float.from(i) * row_h
     add(margin, y, right, y, 1.0, 1.0, 1.0, 1.0,
-        int.to_float(i * 36), int.to_float(i * 36),
-        1200.0, int.to_float(i) * 80.0, easings[i])
+        float.from(i * 36), float.from(i * 36),
+        1200.0, float.from(i) * 80.0, easings[i])
   }
 }
 
@@ -206,14 +206,14 @@ fn scene_grid() -> Unit = {
   reset()
   let grid = 12
   let size = float.min(vw, vh - 50.0)
-  let gap = size / int.to_float(grid)
+  let gap = size / float.from(grid)
   let ox = (vw - size) / 2.0
   let oy = 50.0
   for i in 0..(grid * grid) {
     let col = i % grid
     let row = i / grid
-    let cx = ox + int.to_float(col) * gap + gap / 2.0
-    let cy = oy + int.to_float(row) * gap + gap / 2.0
+    let cx = ox + float.from(col) * gap + gap / 2.0
+    let cy = oy + float.from(row) * gap + gap / 2.0
     let delay = stag.from_center(col, grid, 60.0) + stag.from_center(row, grid, 60.0)
     add(cx, cy, cx, cy, 0.15, 1.0, 0.1, 1.0, 220.0, 340.0,
         800.0, delay, ease.OUT_ELASTIC)
@@ -228,14 +228,14 @@ fn scene_fireworks() -> Unit = {
   let cy = vh / 2.0 + 10.0
   let radius = float.min(vw, vh) * 0.4
   for i in 0..n {
-    let angle = int.to_float(i) / int.to_float(n) * 6.2832 + int.to_float(i / 12) * 0.5
-    let ring = int.to_float(i % 12) / 12.0
+    let angle = float.from(i) / float.from(n) * 6.2832 + float.from(i / 12) * 0.5
+    let ring = float.from(i % 12) / 12.0
     let dist = radius * 0.15 + ring * radius * 0.85
     let target_x = cx + math.cos(angle) * dist
     let target_y = cy + math.sin(angle) * dist
     let delay = stag.from_center(i % 12, 12, 40.0) + stag.from_center(i / 12, 12, 40.0)
     add(cx, cy, target_x, target_y, 0.0, 1.0, 0.0, 1.0,
-        int.to_float(i) * 2.5, int.to_float(i) * 2.5 + 60.0,
+        float.from(i) * 2.5, float.from(i) * 2.5 + 60.0,
         1000.0, delay, ease.OUT_ELASTIC)
   }
 }
@@ -243,14 +243,14 @@ fn scene_fireworks() -> Unit = {
 @export(wasm, "scene_wave")
 fn scene_wave() -> Unit = {
   reset()
-  let n = int.min(80, int.max(20, float.to_int(vw / 10.0)))
-  let bar_w = (vw - 40.0) / int.to_float(n)
+  let n = int.min(80, int.max(20, int.from_saturating(vw / 10.0)))
+  let bar_w = (vw - 40.0) / float.from(n)
   let base_y = vh * 0.6
   let amp = vh * 0.35
   for i in 0..n {
-    let x = 20.0 + int.to_float(i) * bar_w
-    let delay = int.to_float(i) * 25.0
-    let hue_start = 200.0 + int.to_float(i) / int.to_float(n) * 160.0
+    let x = 20.0 + float.from(i) * bar_w
+    let delay = float.from(i) * 25.0
+    let hue_start = 200.0 + float.from(i) / float.from(n) * 160.0
     add(x, base_y, x, base_y - amp, 1.0, 1.0, 0.3, 1.0,
         hue_start, hue_start + 40.0, 600.0, delay, ease.OUT_QUART)
   }
@@ -267,11 +267,11 @@ fn scene_camera() -> Unit = {
     for iy in 0..gy {
       for ix in 0..gx {
         let idx = iz * gx * gy + iy * gx + ix
-        let px = (int.to_float(ix) - 2.5) * spacing
-        let py = (int.to_float(iy) - 2.5) * spacing
-        let pz = (int.to_float(iz) - 1.0) * spacing
+        let px = (float.from(ix) - 2.5) * spacing
+        let py = (float.from(iy) - 2.5) * spacing
+        let pz = (float.from(iz) - 1.0) * spacing
         xs = xs + [px] ys = ys + [py] scales = scales + [pz]
-        opacities = opacities + [1.0] hues = hues + [200.0 + int.to_float(idx) * 1.5]
+        opacities = opacities + [1.0] hues = hues + [200.0 + float.from(idx) * 1.5]
         let t0 = tw.create(0.0, 0.0, 1000.0) |> tw.looping
         tw_x = tw_x + [t0] tw_y = tw_y + [t0] tw_s = tw_s + [t0] tw_o = tw_o + [t0] tw_h = tw_h + [t0]
         active_count = active_count + 1
