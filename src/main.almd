@@ -144,7 +144,7 @@ fn scene_morph() -> Unit = {
   morph_cy = vh / 2.0
   morph_shape = 0
   let r = float.min(vw, vh) * 0.35
-  for i in 0..MORPH_N {
+  for i in 0..<MORPH_N {
     let p = shape_circle(i, MORPH_N, morph_cx, morph_cy, r)
     let hue = float.from(i) / float.from(MORPH_N) * 360.0
     xs = xs + [p.x] ys = ys + [p.y] scales = scales + [1.0]
@@ -164,7 +164,7 @@ fn morph_next() -> Unit = {
   if morph_active == 0 then () else {
     morph_shape = (morph_shape + 1) % 5
     let r = float.min(vw, vh) * 0.35
-    for i in 0..MORPH_N {
+    for i in 0..<MORPH_N {
       let target = get_shape_pos(morph_shape, i, MORPH_N, morph_cx, morph_cy, r)
       let delay = stag.from_center(i, MORPH_N, 3.0)
       tw_x[i] = tw.create(xs[i], target.x, 1200.0) |> tw.with_easing(ease.OUT_ELASTIC) |> tw.with_delay(delay)
@@ -193,7 +193,7 @@ fn scene_easing() -> Unit = {
   let margin = vw * 0.2
   let right = vw - 40.0
   let row_h = (vh - 60.0) / 10.0
-  for i in 0..10 {
+  for i in 0..<10 {
     let y = 50.0 + float.from(i) * row_h
     add(margin, y, right, y, 1.0, 1.0, 1.0, 1.0,
         float.from(i * 36), float.from(i * 36),
@@ -209,7 +209,7 @@ fn scene_grid() -> Unit = {
   let gap = size / float.from(grid)
   let ox = (vw - size) / 2.0
   let oy = 50.0
-  for i in 0..(grid * grid) {
+  for i in 0..<(grid * grid) {
     let col = i % grid
     let row = i / grid
     let cx = ox + float.from(col) * gap + gap / 2.0
@@ -227,7 +227,7 @@ fn scene_fireworks() -> Unit = {
   let cx = vw / 2.0
   let cy = vh / 2.0 + 10.0
   let radius = float.min(vw, vh) * 0.4
-  for i in 0..n {
+  for i in 0..<n {
     let angle = float.from(i) / float.from(n) * 6.2832 + float.from(i / 12) * 0.5
     let ring = float.from(i % 12) / 12.0
     let dist = radius * 0.15 + ring * radius * 0.85
@@ -247,7 +247,7 @@ fn scene_wave() -> Unit = {
   let bar_w = (vw - 40.0) / float.from(n)
   let base_y = vh * 0.6
   let amp = vh * 0.35
-  for i in 0..n {
+  for i in 0..<n {
     let x = 20.0 + float.from(i) * bar_w
     let delay = float.from(i) * 25.0
     let hue_start = 200.0 + float.from(i) / float.from(n) * 160.0
@@ -263,9 +263,9 @@ fn scene_camera() -> Unit = {
   let gy = 6
   let gz = 3
   let spacing = 60.0
-  for iz in 0..gz {
-    for iy in 0..gy {
-      for ix in 0..gx {
+  for iz in 0..<gz {
+    for iy in 0..<gy {
+      for ix in 0..<gx {
         let idx = iz * gx * gy + iy * gx + ix
         let px = (float.from(ix) - 2.5) * spacing
         let py = (float.from(iy) - 2.5) * spacing
@@ -304,7 +304,7 @@ fn update(dt_ms: Float) -> Unit = {
     let cam_y = math.sin(pitch) * dist
     let cam_z = math.sin(angle) * dist
     screen_x = [] screen_y = [] screen_s = [] screen_o = []
-    for i in 0..active_count {
+    for i in 0..<active_count {
       let dx = xs[i] - cam_x
       let dy = ys[i] - cam_y
       let dz = scales[i] - cam_z
@@ -326,7 +326,7 @@ fn update(dt_ms: Float) -> Unit = {
       }
     }
   } else {
-    for i in 0..active_count {
+    for i in 0..<active_count {
       tw_x[i] = tw.tick(tw_x[i], dt_ms)
       tw_y[i] = tw.tick(tw_y[i], dt_ms)
       tw_s[i] = tw.tick(tw_s[i], dt_ms)
