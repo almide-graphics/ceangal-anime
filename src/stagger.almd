@@ -9,13 +9,13 @@ import self.easing as ease
 
 // Linear stagger: offset = index * step
 fn linear(index: Int, total: Int, step: Float) -> Float =
-  int.to_float(index) * step
+  float.from(index) * step
 
 // Range stagger: distribute [start, end] across N elements
 fn range(index: Int, total: Int, start: Float, end: Float) -> Float = {
   if total <= 1 then start
   else {
-    let t = int.to_float(index) / int.to_float(total - 1)
+    let t = float.from(index) / float.from(total - 1)
     start + (end - start) * t
   }
 }
@@ -24,7 +24,7 @@ fn range(index: Int, total: Int, start: Float, end: Float) -> Float = {
 fn eased(index: Int, total: Int, start: Float, end: Float, easing: Int) -> Float = {
   if total <= 1 then start
   else {
-    let t = int.to_float(index) / int.to_float(total - 1)
+    let t = float.from(index) / float.from(total - 1)
     let et = ease.apply(easing, t)
     start + (end - start) * et
   }
@@ -34,8 +34,8 @@ fn eased(index: Int, total: Int, start: Float, end: Float, easing: Int) -> Float
 fn from_center(index: Int, total: Int, step: Float) -> Float = {
   if total <= 1 then 0.0
   else {
-    let center = int.to_float(total - 1) / 2.0
-    let dist = float.abs(int.to_float(index) - center)
+    let center = float.from(total - 1) / 2.0
+    let dist = float.abs(float.from(index) - center)
     dist * step
   }
 }
@@ -44,9 +44,9 @@ fn from_center(index: Int, total: Int, step: Float) -> Float = {
 fn from_edges(index: Int, total: Int, step: Float) -> Float = {
   if total <= 1 then 0.0
   else {
-    let center = int.to_float(total - 1) / 2.0
+    let center = float.from(total - 1) / 2.0
     let max_dist = center
-    let dist = float.abs(int.to_float(index) - center)
+    let dist = float.abs(float.from(index) - center)
     (max_dist - dist) * step
   }
 }
@@ -55,7 +55,7 @@ fn from_edges(index: Int, total: Int, step: Float) -> Float = {
 
 fn delays(total: Int, step: Float) -> List[Float] = {
   var result: List[Float] = []
-  for i in 0..total {
+  for i in 0..<total {
     result = result + [linear(i, total, step)]
   }
   result
@@ -63,7 +63,7 @@ fn delays(total: Int, step: Float) -> List[Float] = {
 
 fn delays_from_center(total: Int, step: Float) -> List[Float] = {
   var result: List[Float] = []
-  for i in 0..total {
+  for i in 0..<total {
     result = result + [from_center(i, total, step)]
   }
   result
